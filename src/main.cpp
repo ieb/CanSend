@@ -27,6 +27,11 @@
 //#define USE_MCP_CAN_CLOCK_SET 8  // Uncomment this, if your mcp_can shield has 8MHz chrystal
 //#define ESP32_CAN_TX_PIN GPIO_NUM_16 // Uncomment this and set right CAN TX pin definition, if you use ESP32 and do not have TX on default IO 16
 //#define ESP32_CAN_RX_PIN GPIO_NUM_17 // Uncomment this and set right CAN RX pin definition, if you use ESP32 and do not have RX on default IO 4
+
+#define ESP32_CAN_RX_PIN GPIO_NUM_22
+#define ESP32_CAN_TX_PIN GPIO_NUM_23
+
+
 //#define NMEA2000_ARDUINO_DUE_CAN_BUS tNMEA2000_due::CANDevice1    // Uncomment this, if you want to use CAN bus 1 instead of 0 for Arduino DUE
 #include <NMEA2000_CAN.h>  // This will automatically choose right CAN library and create suitable NMEA2000 object
 #include <N2kMessages.h>
@@ -65,6 +70,11 @@ void CheckLoopTime();
 bool IsTimeToUpdate(unsigned long NextUpdate);
 void SetNextUpdate(unsigned long &NextUpdate, unsigned long Period, unsigned long Offset=0);
 
+
+void HandleNMEA2000Msg(const tN2kMsg &N2kMsg) {
+  N2kMsg.Print(&Serial);
+}
+
 // *****************************************************************************
 void setup() {
   // Initialize serial port.
@@ -93,6 +103,11 @@ void setup() {
    NMEA2000.SetForwardType(tNMEA2000::fwdt_Text); // Show in clear text. Leave uncommented for default Actisense format.
    NMEA2000.SetForwardOwnMessages(false); // Do not print own messages.
 
+
+  NMEA2000.SetN2kCANReceiveFrameBufSize(150);
+  NMEA2000.SetN2kCANMsgBufSize(8);
+  NMEA2000.SetMsgHandler(HandleNMEA2000Msg);
+
   // We act as real node on bus. Some devices does not show messages, if they can not request information.
   NMEA2000.SetMode(tNMEA2000::N2km_ListenAndNode,22);
   //NMEA2000.SetDebugMode(tNMEA2000::dm_ClearText); // Uncomment this, so you can test code without CAN bus chips on Arduino Mega
@@ -103,6 +118,9 @@ void setup() {
   Serial.println("  Message sending to bus starts in 10 seconds.");
   Serial.println("  Type ?<lf> for available commands.");
 }
+
+
+
 
 // *****************************************************************************
 void SendN2kMsg(const tN2kMsg &N2kMsg) {
@@ -165,20 +183,27 @@ void loop() {
   }
 }
 
+
+double periodicValue(double mean, double amplitude, double periodS) {
+    return mean + amplitude*sin(((2.0*PI)/(periodS*1000))*millis());
+}
+
+
 // *****************************************************************************
 double ReadCabinTemp() {
-  return CToKelvin(21.11); // Read here the true temperature e.g. from analog input
+
+  return CToKelvin(periodicValue(21.11,3,100)); // Read here the true temperature e.g. from analog input
 }
 
 // *****************************************************************************
 double ReadWaterTemp() {
-  return CToKelvin(15.5); // Read here the true temperature e.g. from analog input
+  return CToKelvin(periodicValue(15.5,5,200)); // Read here the true temperature e.g. from analog input
 }
 
 // *****************************************************************************
 void SendN2kAttitude() {
   tN2kMsg N2kMsg;
-  SetN2kAttitude(N2kMsg,1,DegToRad(-3.1),DegToRad(2.4),DegToRad(-7.8));
+  SetN2kAttitude(N2kMsg,1,DegToRad(periodicValue(0,3.1,30)),DegToRad(periodicValue(0,3.1,20)),DegToRad(periodicValue(0,8,15)));
   SendN2kMsg(N2kMsg);
 }
 
@@ -199,7 +224,7 @@ void SendN2kLocalOffset() {
 // *****************************************************************************
 void SendN2kRudder() {
   tN2kMsg N2kMsg;
-  SetN2kRudder(N2kMsg,DegToRad(5),1,N2kRDO_MoveToStarboard,DegToRad(-5));
+  SetN2kRudder(N2kMsg,DegToRad(periodicValue(0,5,30)),1,N2kRDO_MoveToStarboard,DegToRad(-5));
   SendN2kMsg(N2kMsg);
 }
 
@@ -337,7 +362,7 @@ void SendN2kIsoAddressClaim() {
 // *****************************************************************************
 void SendN2kPressure() {
   tN2kMsg N2kMsg;
-  SetN2kPressure(N2kMsg,0,2,N2kps_Atmospheric,mBarToPascal(1024));
+  SetN2kPressure(N2kMsg,0,2,N2kps_Atmospheric,mBarToPascal(periodicValue(1024,20,200)));
   SendN2kMsg(N2kMsg);
 }
 
@@ -351,7 +376,7 @@ void SendN2kSetPressure() {
 // *****************************************************************************
 void SendN2kHumidity() {
   tN2kMsg N2kMsg;
-  SetN2kHumidity(N2kMsg,0xff,1,N2khs_InsideHumidity,41.8); //,43);
+  SetN2kHumidity(N2kMsg,0xff,1,N2khs_InsideHumidity,periodicValue(55,10,100)); //,43);
   SendN2kMsg(N2kMsg);
 }
 
@@ -486,21 +511,20 @@ void SendN2kEngineRapid() {
 // *****************************************************************************
 void SendN2kCOGSOGRapid() {
   tN2kMsg N2kMsg;
-  SetN2kCOGSOGRapid(N2kMsg,1,N2khr_true,DegToRad(115.6),0.1);
+  SetN2kCOGSOGRapid(N2kMsg,1,N2khr_true,DegToRad(periodicValue(115.6,10,30)),periodicValue(6.1,3,100));
   SendN2kMsg(N2kMsg);
 }
 
 // *****************************************************************************
 void SendN2kMagneticHeading() {
-  static double Heading=227.5;
   tN2kMsg N2kMsg;
-  SetN2kMagneticHeading(N2kMsg, 0, DegToRad(Heading), DegToRad(-3.0), DegToRad(5.5)); 
+  SetN2kMagneticHeading(N2kMsg, 0, DegToRad(periodicValue(227.5,10,30)), DegToRad(-3.0), DegToRad(5.5)); 
   SendN2kMsg(N2kMsg);
 }
 
 void SendN2kWind() {
   tN2kMsg N2kMsg;
-  SetN2kWindSpeed(N2kMsg, 0, KnotsToms(15.3), DegToRad(360-24.0), N2kWind_Apparent); 
+  SetN2kWindSpeed(N2kMsg, 0, KnotsToms(periodicValue(15,10,300)), DegToRad(periodicValue(180,160,3000)), N2kWind_Apparent); 
   SendN2kMsg(N2kMsg);
 }
 
@@ -530,12 +554,12 @@ void SendN2kFluidLevel() {
 
 void SendN2kSpeed() {
   tN2kMsg N2kMsg;
-  SetN2kBoatSpeed(N2kMsg, 34,KnotsToms(12.2)); 
+  SetN2kBoatSpeed(N2kMsg, 34,KnotsToms(periodicValue(12,4,100))); 
   SendN2kMsg(N2kMsg);
 }
 void SendN2kWaterDepth() {
   tN2kMsg N2kMsg;
-  SetN2kWaterDepth(N2kMsg, 34, 5.1,0.1); 
+  SetN2kWaterDepth(N2kMsg, 34, periodicValue(15,5,100),0.1); 
   SendN2kMsg(N2kMsg);
 }
 
