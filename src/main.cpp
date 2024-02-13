@@ -36,6 +36,9 @@
 #include <NMEA2000_CAN.h>  // This will automatically choose right CAN library and create suitable NMEA2000 object
 #include <N2kMessages.h>
 #include <N2kMaretron.h>
+#include "navigate.h"
+
+
 
 using tN2kSendFunction=void (*)();
 
@@ -63,6 +66,11 @@ static bool Sending=true;
 static bool EnableForward=false;
 static unsigned long NextStatsTime=3000;
 static unsigned long StatisticsPeriod=2000;
+
+Position wp1 = { 51.9379066059753, 1.491858780192354, NULL};
+Position wp2 = { 51.90313504276786, 1.3797427676025804, NULL};
+Position wp3 = { 51.909854375508516, 1.3451469694320215, NULL};
+Boat boat = Boat();
 
 // Forward declarations for functions
 void CheckCommand(); 
@@ -114,10 +122,18 @@ void setup() {
   NMEA2000.EnableForward(EnableForward); // Disable all msg forwarding to USB (=Serial)
   NMEA2000.Open();
 
+
+
+  wp1.next = &wp2;
+  wp2.next = &wp3;
+  wp3.next = &wp1;
+  boat.setRoute(&wp1);
+
   Serial.println("Starting message sender!");
   Serial.println("  Message sending to bus starts in 10 seconds.");
   Serial.println("  Type ?<lf> for available commands.");
 }
+
 
 
 
@@ -165,8 +181,22 @@ void SendN2kMessages() {
   }
 }
 
+void Navigate() {
+  static unsigned long NextNav=0;
+
+  if ( IsTimeToUpdate(NextNav) ) {
+    NextNav=millis()+1000;
+    boat.navigate(2000); // 2x rate
+  }
+
+}
+
+
+
+
 // *****************************************************************************
 void loop() {
+  Navigate();
   if ( Sending ) SendN2kMessages();
   NMEA2000.ParseMessages();
   CheckCommand();
@@ -235,7 +265,7 @@ void SendN2kGNSS() {
   uint16_t daysSince1970 = 18973+(now/(24*3600000));
   double secondsSinceMidnight = (now%(24*3600000))/1000;
 
-  SetN2kGNSS(N2kMsg,1,daysSince1970,secondsSinceMidnight,60.436614990,22.237819671,10.5,N2kGNSSt_GPS,N2kGNSSm_GNSSfix,12,0.8,0.5,15,1,N2kGNSSt_GPS,15,2);
+  SetN2kGNSS(N2kMsg,1,daysSince1970,secondsSinceMidnight,boat.pos.lat,boat.pos.lon,10.5,N2kGNSSt_GPS,N2kGNSSm_GNSSfix,12,0.8,0.5,15,1,N2kGNSSt_GPS,15,2);
   SendN2kMsg(N2kMsg);
 }
 
@@ -252,8 +282,8 @@ void SendN2kDistanceLog() {
          unsigned long now = millis();
          uint16_t daysSince1970 = 18973+(now/(24*3600000));
          double secondsSinceMidnight = (now%(24*3600000))/1000;
-         uint32_t log = 1852  + (1852.0*now)/(6000);
-         uint32_t  tripLog = (1852.0*now)/(6000);
+         uint32_t log =  boat.log;// 1852  + (1852.0*now)/(6000);
+         uint32_t  tripLog = boat.log; //(1852.0*now)/(6000);
 
   SetN2kDistanceLog(N2kMsg,daysSince1970,secondsSinceMidnight, log, tripLog);
   SendN2kMsg(N2kMsg);
@@ -511,14 +541,17 @@ void SendN2kEngineRapid() {
 // *****************************************************************************
 void SendN2kCOGSOGRapid() {
   tN2kMsg N2kMsg;
-  SetN2kCOGSOGRapid(N2kMsg,1,N2khr_true,DegToRad(periodicValue(115.6,10,30)),periodicValue(6.1,3,100));
+  SetN2kCOGSOGRapid(N2kMsg,1,N2khr_true,boat.cog,boat.sog);
+ // SetN2kCOGSOGRapid(N2kMsg,1,N2khr_true,boat.cog  DegToRad(periodicValue(115.6,10,30)),periodicValue(6.1,3,100));
   SendN2kMsg(N2kMsg);
+  boat.sog = periodicValue(6.1,3,100);
 }
 
 // *****************************************************************************
 void SendN2kMagneticHeading() {
   tN2kMsg N2kMsg;
-  SetN2kMagneticHeading(N2kMsg, 0, DegToRad(periodicValue(227.5,10,30)), DegToRad(-3.0), DegToRad(5.5)); 
+  SetN2kMagneticHeading(N2kMsg, 0, boat.cog, DegToRad(-3.0), DegToRad(5.5)); 
+//  SetN2kMagneticHeading(N2kMsg, 0, boat.cogDegToRad(periodicValue(227.5,10,30)), DegToRad(-3.0), DegToRad(5.5)); 
   SendN2kMsg(N2kMsg);
 }
 

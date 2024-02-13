@@ -1,0 +1,90 @@
+#include "navigate.h"
+#include <iostream>
+#include <unistd.h>  
+
+int main() {
+    Position wp1 = { 51.9379066059753, 1.491858780192354, NULL};
+    Position wp2 = { 51.90313504276786, 1.3797427676025804, NULL};
+    Position wp3 = { 51.909854375508516, 1.3451469694320215, NULL};
+    wp1.next = &wp2;
+    wp2.next = &wp3;
+    wp3.next = &wp1;
+    Boat boat = Boat();
+    boat.setRoute(&wp1);
+    boat.sog = 20.2;
+    std::cout << "WP1,  " << wp1.lat << "," << wp1.lon << std::endl;
+    std::cout << "WP2, " << wp1.lat << "," << wp1.lon << std::endl;
+    std::cout << "WP3,  " << wp1.lat << "," << wp1.lon << std::endl;
+    // 8606 m
+    double d = boat.distanceBetween(&wp1, &wp2);
+    if (abs(d-8615.9) > 0.1) {
+        std::cout << "WP1 -> WP2 expected distance 8615.9, got " << d  << std::endl;
+
+    }
+    d = boat.distanceBetween(&wp2, &wp1);
+    if (abs(d-8615.9) > 0.1) {
+        std::cout << "WP2 -> WP1 expected distance 8615.9, got " << d  << std::endl;
+    }
+    d = boat.distanceBetween(&wp1, &wp3);
+    if (abs(d-10544.9) > 0.1) {
+        std::cout << "WP1 -> WP3 expected distance 10544.9, got " << d  << std::endl;
+    }
+    d = boat.distanceBetween(&wp3, &wp1);
+    if (abs(d-10544.9) > 0.1) {
+        std::cout << "WP3 -> WP1 expected distance 10544.9, got " << d  << std::endl;
+    }
+    d = boat.distanceBetween(&wp2, &wp3);
+    if (abs(d-2490.92) > 0.1) {
+        std::cout << "WP2 -> WP3 expected distance 2490.92, got " << d  << std::endl;
+    }
+    d = boat.distanceBetween(&wp3, &wp2);
+    if (abs(d-2490.92) > 0.1) {
+        std::cout << "WP3 -> WP2 expected distance 2490.92, got " << d  << std::endl;
+    }
+    double b = boat.bearing(&wp1, &wp2) * 180.0/PI;
+    if (abs(b-243.3) > 0.1) {
+        std::cout << "WP1 -> WP2 bearing 243.3, got " << b  << std::endl;
+    }
+    double br = boat.bearing(&wp2, &wp1) * 180.0/PI;
+    if (abs(br-63.3) > 0.1) {
+        std::cout << "WP2 -> WP1 bearing 63.3, got " << br << std::endl;
+    }
+    if ( abs(abs(b-br)-180.0) > 0.1 ) {
+        std::cout << "Bearings  WP1 - WP2 not reciprocal " << abs(b-br)  << std::endl;
+    }
+    b = boat.bearing(&wp1, &wp3) * 180.0/PI;
+    if (abs(b-252.77) > 0.1) {
+        std::cout << "WP1 -> WP3 bearing 252.77, got " << b  << std::endl;
+    }
+    br = boat.bearing(&wp3, &wp1) * 180.0/PI;
+    if (abs(br-72.77) > 0.1) {
+        std::cout << "WP3 -> WP1 bearing 72.77, got " << br << std::endl;
+    }
+    if ( abs(abs(b-br)-180.0) > 0.2 ) {
+        std::cout << "Bearings  WP1 - WP3 not reciprocal " << abs(b-br)  << std::endl;
+    }
+    b = boat.bearing(&wp2, &wp3) * 180.0/PI;
+    if (abs(b-287.47) > 0.1) {
+        std::cout << "WP2 -> WP3 bearing 287.47, got " << b  << std::endl;
+    }
+    br = boat.bearing(&wp3, &wp2) * 180.0/PI;
+    if (abs(br-107.47) > 0.1) {
+        std::cout << "WP3 -> WP2 bearing 107.47, got " << br << std::endl;
+    }
+    if ( abs(abs(b-br)-180.0) > 0.1 ) {
+        std::cout << "Bearings  WP2 - WP3 not reciprocal " << abs(b-br)  << std::endl;
+    }
+    BezierNoise bn = BezierNoise();
+//    for (int i = 0; i < 1000; i++ ) {
+//        bn.next();
+//    }
+
+    while(true) {
+        if ( boat.navigate(10000) ) {
+            std::cout << "New Waypoint btw:" << boat.btw*180.0/PI << " dtw:" << boat.dtw << std::endl;
+        }
+        std::cout << " lat:" << boat.pos.lat << " lon:" << boat.pos.lon << " dtw:" << boat.dtw << " btw:" << boat.btw*180/PI << " cog:" << boat.cog*180/PI << " log:" << boat.log << std::endl;
+        usleep(100000);
+    }
+    
+}
