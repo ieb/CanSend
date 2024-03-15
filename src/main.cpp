@@ -493,7 +493,9 @@ void SendN2kTransmissionParameters() {
 // *****************************************************************************
 void SendN2kAISClassAPosition() {
   tN2kMsg N2kMsg;
-  SetN2kAISClassAPosition(N2kMsg, 1, tN2kAISRepeat::N2kaisr_First, 123456789, 26.396, -80.075, 1, 1, 1, 20, 20, 30, 0, tN2kAISNavStatus::N2kaisns_At_Anchor);
+
+  SetN2kAISClassAPosition(N2kMsg, 1, tN2kAISRepeat::N2kaisr_First, 123456789, 26.396, -80.075, 
+              1, 1, 1, 20, 20, tN2kAISTransceiverInformation::N2kaischannel_A_VDL_reception, 30, 0, tN2kAISNavStatus::N2kaisns_At_Anchor);
   SendN2kMsg(N2kMsg);
 }
 
